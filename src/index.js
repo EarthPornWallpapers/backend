@@ -57,11 +57,15 @@ const processImage = ({
   reddit_username,
   reddit_thread
 }) => {
+  console.log("pre-resizer");
   resizer.batch(image, filename, maxRes, images => {
+    console.log("BATCH STARTED");
     const uploads = [];
     images.forEach(({ data, output }) => uploads.push(aws.put(data, output)));
+    console.log("PROMISES:", uploads);
     Promise.all(uploads)
       .then(data => {
+        console.log(uploads)
         const ext = path.extname(filename);
         const base = path.basename(filename, ext);
         console.info({
@@ -89,47 +93,51 @@ const processImage = ({
   });
 };
 
-// Load and process the RSS feed
-rss.load(entries => {
-  const queue = [];
+const start = onComplete =>
+  // Load and process the RSS feed
+  rss.load(entries => {
+    const queue = [];
 
-  entries.forEach(entry => {
-    if (entry.image) {
-      const src = path.basename(entry.image);
-      const timestamp = new Date(entry.pubDate).getTime();
-      const dest = getFilename(src, timestamp);
+    entries.forEach(entry => {
+      if (entry.image) {
+        const src = path.basename(entry.image);
+        const timestamp = new Date(entry.pubDate).getTime();
+        const dest = getFilename(src, timestamp);
 
-      if (downloader.alreadySaved(dest)) {
-        console.log(`Already downloaded ${src}; skipping.`);
-      } else {
-        console.log(`Downloading ${src} as ${dest}...`);
+        if (downloader.alreadySaved(dest)) {
+          console.log(`Already downloaded ${src}; skipping.`);
+        } else {
+          const data = rss.parseEntry(entry);
 
-        const data = rss.parseEntry(entry);
-
-        if (data.isOC) {
-          downloader.save(entry.image, dest, (filename, image) => {
-            const maxRes = maxWallpaperSize(image);
-            if (maxRes >= minResolutions - 1) {
-              queue.push({
-                filename,
-                image,
-                maxRes,
-                timestamp,
-                title: data.title,
-                reddit_username: entry.author,
-                reddit_thread: entry.link
-              });
-            } else {
-              console.info(`Skipping ${filename}. Source image too small.`);
-            }
-          });
+          if (data.isOC) {
+            console.log(`Downloading ${entry.image} as ${dest}...`);
+            downloader.save(entry.image, dest, (filename, image) => {
+              const maxRes = maxWallpaperSize(image);
+              if (maxRes >= minResolutions - 1) {
+                queue.push({
+                  filename,
+                  image,
+                  maxRes,
+                  timestamp,
+                  title: data.title,
+                  reddit_username: entry.author,
+                  reddit_thread: entry.link
+                });
+              } else {
+                console.info(`Skipping ${filename}. Source image too small.`);
+              }
+            });
+          }
         }
       }
-    }
+    });
+
+    db.start(() => {
+      batch.start(queue, processImage);
+    });
+    // db.close();
   });
 
-  db.start(() => {
-    batch.start(queue, processImage);
-  });
-  // db.close();
-});
+export default {
+  start
+};
