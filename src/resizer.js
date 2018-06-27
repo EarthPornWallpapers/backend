@@ -13,18 +13,25 @@ const getFilenameForSize = (filename, size) => {
   return `${base}.${postfix}${ext}`;
 };
 
-const resize = (image, size, output) =>
-  sharp(image)
-    .resize(size.width, size.height)
-    .toFile(output);
+const resize = (image, size) => sharp(image).resize(size.width, size.height);
 
-const batch = (image, filename, maxRes) => {
-  resolutions.slice(0, maxRes + 1).forEach(res => {
+const batch = (image, filename, maxRes, onComplete) => {
+  const sizes = resolutions.slice(0, maxRes + 1);
+  const images = [];
+  sizes.forEach(res => {
     console.info(`RESIZING ${filename} to ${res.width}x${res.height}`);
     const output = path.join(dir.out, getFilenameForSize(filename, res));
-    resize(image, res, output)
+    resize(image, res)
+      .toBuffer(output)
       .then(data => {
-        console.info(`RESIZED -> ${output}`);
+        console.info(`resized ${output}`)
+        images.push({ data, output })
+        // Check if that was the last file to resize
+        if (images.length === sizes.length) {
+          console.info('finished resizing')
+          // Return the resized image buffers to the callback
+          onComplete(images)
+        }
       })
       .catch(err => {
         throw err;
@@ -35,4 +42,4 @@ const batch = (image, filename, maxRes) => {
 export default {
   resize,
   batch
-}
+};

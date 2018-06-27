@@ -8,6 +8,7 @@
     "db:init": "babel-node scripts/dbinit.js"
   },
   "dependencies": {
+    "aws-sdk": "^2.264.1",
     "babel-cli": "^6.26.0",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-preset-latest": "^6.24.1",
@@ -18,5 +19,8 @@
     "rss-parser": "^3.4.2",
     "sharp": "^0.20.4",
     "sqlite3": "^4.0.1"
+  },
+  "devDependencies": {
+    "dotenv": "^6.0.0"
   }
 }

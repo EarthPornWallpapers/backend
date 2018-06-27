@@ -1,16 +1,18 @@
 import path from "path";
+import dotenv from "dotenv";
 import sizeOf from "image-size";
 import { resolutions } from "./config";
 import db from "./db";
 import rss from "./rss";
+import aws from "./aws";
 import downloader from "./downloader";
 import resizer from "./resizer";
 import batch from "./batch";
 
+dotenv.config();
 // This defines how many different resolutions an image needs to support
 // in order to get uploaded.
 const minResolutions = 5;
-
 
 // Finds the max wallpaper resolution that can be used for the provided image buffer
 const maxWallpaperSize = image => {
@@ -42,22 +44,31 @@ const getFilename = (filename, timestamp) => {
 };
 
 const processImage = ({ image, filename, maxRes, timestamp, title }) => {
-  resizer.batch(image, filename, maxRes);
-  const ext = path.extname(filename);
-  const base = path.basename(filename, ext);
-  console.info({
-    timestamp,
-    title,
-    filename: base,
-    type: ext,
-    sizes: getSizeList(maxRes)
-  });
-  db.insertImage({
-    timestamp,
-    title,
-    filename: base,
-    type: ext,
-    sizes: getSizeList(maxRes)
+  resizer.batch(image, filename, maxRes, images => {
+    const uploads = [];
+    images.forEach(({ data, output }) => uploads.push(aws.put(data, output)));
+    Promise.all(uploads)
+      .then(data => {
+        const ext = path.extname(filename);
+        const base = path.basename(filename, ext);
+        console.info({
+          timestamp,
+          title,
+          filename: base,
+          type: ext,
+          sizes: getSizeList(maxRes)
+        });
+        db.insertImage({
+          timestamp,
+          title,
+          filename: base,
+          type: ext,
+          sizes: getSizeList(maxRes)
+        });
+      })
+      .catch(err => {
+        throw err;
+      });
   });
 };
 
