@@ -1,4 +1,4 @@
-import db from "../db";
+import db from "../src/db";
 
 db.start(() => {
   db.sql.run(`CREATE TABLE images (

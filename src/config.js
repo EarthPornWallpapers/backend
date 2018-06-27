@@ -1,5 +1,10 @@
 export const database = 'wallpapers.db';
 
+export const dir = {
+  tmp: "./tmp",
+  out: "./wallpapers"
+};
+
 // Desktop resolutions to target
 // Resolution data extracted from: http://gs.statcounter.com/screen-resolution-stats/desktop/worldwide
 // with a few additional resolutions
