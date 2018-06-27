@@ -24,13 +24,20 @@ const batch = (image, filename, maxRes, onComplete) => {
     resize(image, res)
       .toBuffer(output)
       .then(data => {
-        console.info(`resized ${output}`)
-        images.push({ data, output })
+        console.info(`resized ${output}`);
+        images.push({ data, output });
         // Check if that was the last file to resize
         if (images.length === sizes.length) {
-          console.info('finished resizing')
+          console.info("finished resizing");
+          // Add the original image to the return array
+          // This is so  we can have an archived version of the
+          // original image in the `src/` path.
+          images.push({
+            data: image,
+            output: path.join(dir.src, path.basename(filename))
+          });
           // Return the resized image buffers to the callback
-          onComplete(images)
+          onComplete(images);
         }
       })
       .catch(err => {

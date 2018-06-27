@@ -2,7 +2,8 @@ export const database = "wallpapers.db";
 
 export const dir = {
   tmp: "./tmp",
-  out: "./download"
+  out: "./download",
+  src: "./src"
 };
 
 export const bucket = "earthpornwallpapers";

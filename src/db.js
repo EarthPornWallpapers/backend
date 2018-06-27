@@ -7,10 +7,18 @@ const db = new sql.Database(database);
 const start = block => db.serialize(block);
 const close = () => db.close();
 
-const insertImage = ({ timestamp, title, filename, type, sizes }) => {
+const insertImage = ({
+  timestamp,
+  title,
+  reddit_username,
+  reddit_thread,
+  filename,
+  type,
+  sizes
+}) => {
   db.run(
-    "INSERT INTO images (timestamp, title, filename, type, sizes) VALUES (?, ?, ?, ?, ?)",
-    [timestamp, title, filename, type, sizes]
+    "INSERT INTO images (timestamp, title, reddit_username, reddit_thread, filename, type, sizes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [timestamp, title, reddit_username, reddit_thread, filename, type, sizes]
   );
 };
 

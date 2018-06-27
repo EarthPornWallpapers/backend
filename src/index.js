@@ -1,4 +1,5 @@
 import path from "path";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import sizeOf from "image-size";
 import { resolutions } from "./config";
@@ -39,11 +40,23 @@ const getFilename = (filename, timestamp) => {
   const ext = path.extname(filename);
   // Get the base filename without extension
   const base = path.basename(filename, ext);
+  const output = crypto
+    .createHash("md5")
+    .update(`${base}.${timestamp}${ext}`)
+    .digest("hex");
   // Return the compiled filename
-  return `${base}.${timestamp}${ext}`;
+  return `${output}${ext}`;
 };
 
-const processImage = ({ image, filename, maxRes, timestamp, title }) => {
+const processImage = ({
+  image,
+  filename,
+  maxRes,
+  timestamp,
+  title,
+  reddit_username,
+  reddit_thread
+}) => {
   resizer.batch(image, filename, maxRes, images => {
     const uploads = [];
     images.forEach(({ data, output }) => uploads.push(aws.put(data, output)));
@@ -54,6 +67,8 @@ const processImage = ({ image, filename, maxRes, timestamp, title }) => {
         console.info({
           timestamp,
           title,
+          reddit_username,
+          reddit_thread,
           filename: base,
           type: ext,
           sizes: getSizeList(maxRes)
@@ -61,6 +76,8 @@ const processImage = ({ image, filename, maxRes, timestamp, title }) => {
         db.insertImage({
           timestamp,
           title,
+          reddit_username,
+          reddit_thread,
           filename: base,
           type: ext,
           sizes: getSizeList(maxRes)
@@ -98,7 +115,9 @@ rss.load(entries => {
                 image,
                 maxRes,
                 timestamp,
-                title: data.title
+                title: data.title,
+                reddit_username: entry.author,
+                reddit_thread: entry.link
               });
             } else {
               console.info(`Skipping ${filename}. Source image too small.`);
