@@ -15,38 +15,40 @@ const getFilenameForSize = (filename, size) => {
 
 const resize = (image, size) => sharp(image).resize(size.width, size.height);
 
-const batch = (image, filename, maxRes, onComplete) => {
-  const sizes = resolutions.slice(0, maxRes + 1);
+const batch = async (image, filename, resolutions, onComplete) => {
   const images = [];
-  sizes.forEach(res => {
+  // resolutions.forEach(res => {
+  for (let i = 0; i < resolutions.length; i++) {
+    const res = resolutions[i];
     console.info(`RESIZING ${filename} to ${res.width}x${res.height}`);
     const output = path.join(dir.out, getFilenameForSize(filename, res));
-    resize(image, res)
+    await resize(image, { width: res.width, height: res.height })
       .toBuffer(output)
       .then(data => {
         console.info(`resized ${output}`);
         images.push({ data, output });
         // Check if that was the last file to resize
-        if (images.length === sizes.length) {
+        if (images.length === resolutions.length) {
           console.info("finished resizing");
           // Add the original image to the return array
           // This is so  we can have an archived version of the
           // original image in the `src/` path.
           images.push({
             data: image,
-            output: path.join(dir.src, path.basename(filename))
+            output: path.join(dir.src, path.basename(filename)),
+            resolution: res,
           });
           // Return the resized image buffers to the callback
-          onComplete(images);
         }
       })
       .catch(err => {
         throw err;
       });
-  });
+  }
+  return images;
 };
 
 export default {
   resize,
-  batch
+  batch,
 };

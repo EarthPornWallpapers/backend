@@ -2,7 +2,6 @@ import path from "path";
 import crypto from "crypto";
 import dotenv from "dotenv";
 import sizeOf from "image-size";
-import { resolutions } from "./config";
 import db from "./db";
 import rss from "./rss";
 import aws from "./aws";
@@ -14,17 +13,17 @@ dotenv.config();
 // This defines how many different resolutions an image needs to support
 // in order to get uploaded.
 const minResolutions = 5;
+const cache = {};
 
 // Finds the max wallpaper resolution that can be used for the provided image buffer
-const maxWallpaperSize = image => {
+const getResolutionsForWallpaper = async image => {
   const src = sizeOf(image);
-  let maxRes = null;
-  resolutions.map((res, index) => {
+  return cache.resolutions.filter(res => {
     if (src.width >= res.width && src.height >= res.height) {
-      maxRes = index;
+      return true;
     }
+    return false;
   });
-  return maxRes;
 };
 
 // Returns a comma separated list of resolutions
@@ -48,49 +47,36 @@ const getFilename = (filename, timestamp) => {
   return `${output}${ext}`;
 };
 
-const processImage = ({
+const processImage = async ({
+  resolutions,
   image,
   filename,
-  maxRes,
-  timestamp,
   title,
+  reddit_timestamp,
   reddit_username,
-  reddit_thread
+  reddit_thread,
 }) => {
   console.log("pre-resizer");
-  resizer.batch(image, filename, maxRes, images => {
-    console.log("BATCH STARTED");
-    const uploads = [];
-    images.forEach(({ data, output }) => uploads.push(aws.put(data, output)));
-    console.log("PROMISES:", uploads);
-    Promise.all(uploads)
-      .then(data => {
-        console.log(uploads)
-        const ext = path.extname(filename);
-        const base = path.basename(filename, ext);
-        console.info({
-          timestamp,
-          title,
-          reddit_username,
-          reddit_thread,
-          filename: base,
-          type: ext,
-          sizes: getSizeList(maxRes)
-        });
-        db.insertImage({
-          timestamp,
-          title,
-          reddit_username,
-          reddit_thread,
-          filename: base,
-          type: ext,
-          sizes: getSizeList(maxRes)
-        });
-      })
-      .catch(err => {
-        throw err;
-      });
-  });
+  const images = await resizer.batch(image, filename, resolutions);
+  console.log("BATCH STARTED");
+  const uploads = [];
+  images.forEach(({ data, output }) => uploads.push(aws.put(data, output)));
+  console.log("PROMISES:", uploads);
+  const data = await Promise.all(uploads);
+  console.log(uploads);
+  const ext = path.extname(filename);
+  const base = path.basename(filename, ext);
+  const params = {
+    title,
+    reddit_timestamp,
+    reddit_username,
+    reddit_thread,
+    filename: base,
+    type: ext,
+    resolutions,
+  };
+  // console.info(params);
+  return await db.addWallpaper(params);
 };
 
 const start = onComplete =>
@@ -101,8 +87,10 @@ const start = onComplete =>
     entries.forEach(entry => {
       if (entry.image) {
         const src = path.basename(entry.image);
-        const timestamp = new Date(entry.pubDate).getTime();
-        const dest = getFilename(src, timestamp);
+        const reddit_timestamp = Math.floor(
+          new Date(entry.pubDate).getTime() / 1000
+        );
+        const dest = getFilename(src, reddit_timestamp);
 
         if (downloader.alreadySaved(dest)) {
           console.log(`Already downloaded ${src}; skipping.`);
@@ -112,32 +100,68 @@ const start = onComplete =>
           if (data.isOC) {
             console.log(`Downloading ${entry.image} as ${dest}...`);
             downloader.save(entry.image, dest, (filename, image) => {
-              const maxRes = maxWallpaperSize(image);
-              if (maxRes >= minResolutions - 1) {
-                queue.push({
-                  filename,
-                  image,
-                  maxRes,
-                  timestamp,
-                  title: data.title,
-                  reddit_username: entry.author,
-                  reddit_thread: entry.link
+              getResolutionsForWallpaper(image)
+                .then(resolutions => {
+                  // console.info("RESOLUTIONS", resolutions);
+                  if (resolutions.length >= minResolutions) {
+                    queue.push({
+                      resolutions,
+                      filename,
+                      image,
+                      title: data.title,
+                      reddit_timestamp,
+                      reddit_username: entry.author,
+                      reddit_thread: entry.link,
+                    });
+                  } else {
+                    console.info(
+                      `Skipping ${filename}. Source image too small.`
+                    );
+                  }
+                })
+                .catch(err => {
+                  throw err;
                 });
-              } else {
-                console.info(`Skipping ${filename}. Source image too small.`);
-              }
             });
           }
         }
       }
     });
 
-    db.start(() => {
-      batch.start(queue, processImage);
-    });
+    // db.start();
+    batch.start(queue, processImage);
     // db.close();
   });
 
+if (require.main === module) {
+  db.getResolutions()
+    .then(resolutions => {
+      cache.resolutions = resolutions;
+      // downloader.save(
+      //   "https://i.imgur.com/0MOUaKZ.jpg",
+      //   "asdf.jpg",
+      //   (filename, image) => {
+      //     getResolutionsForWallpaper(image).then(resolutions => {
+      //       processImage({
+      //         resolutions,
+      //         filename,
+      //         image,
+      //         title: "test",
+      //         reddit_timestamp: 1234,
+      //         reddit_username: "asdfas",
+      //         reddit_thread: "asdfasfd",
+      //       });
+      //     });
+      //   }
+      // );
+      start();
+    })
+    .catch(err => {
+      throw err;
+    });
+}
+
 export default {
-  start
+  start,
+  db,
 };

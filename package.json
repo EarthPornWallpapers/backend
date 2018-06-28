@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "nodemon src/index.js --exec babel-node",
-    "start": "babel-node index.js",
+    "start": "nodemon index.js --exec babel-node",
     "db:init": "babel-node scripts/dbinit.js"
   },
   "dependencies": {
@@ -14,15 +14,19 @@
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-preset-latest": "^6.24.1",
     "babel-preset-stage-2": "^6.24.1",
+    "body-parser": "^1.18.3",
     "express": "^4.16.3",
     "image-downloader": "^3.4.1",
     "image-size": "^0.6.3",
     "nodemon": "^1.17.5",
+    "pg": "^7.4.3",
     "rss-parser": "^3.4.2",
+    "sequelize": "^4.38.0",
     "sharp": "^0.20.4",
     "sqlite3": "^4.0.1"
   },
   "devDependencies": {
-    "dotenv": "^6.0.0"
+    "dotenv": "^6.0.0",
+    "sequelize-cli": "^4.0.0"
   }
 }
